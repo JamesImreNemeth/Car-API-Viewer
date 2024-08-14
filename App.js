@@ -1,53 +1,57 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, Button, Image, ActivityIndicator, ScrollView, Platform } from 'react-native';
+import { StyleSheet, Text, View, Image, ActivityIndicator, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function App() {
-  const [carMake, setCarMake] = useState('');
-  const [vehicleTypes, setVehicleTypes] = useState([]);
+  // Manage Applicaition State
+  const [selectedCarMake, setSelectedCarMake] = useState(null);
+  const [models, setModels] = useState([]);
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const unsplashAccessKey = 'KPjZbLm5WYrLVamOw5tT28ebOjgxgVjgGHQha4oMtos'; // Replace with your actual Unsplash Access Key
+  // API access key
+  const unsplashAccessKey = 'KPjZbLm5WYrLVamOw5tT28ebOjgxgVjgGHQha4oMtos';
 
-  const fetchCarModels = () => {
+  // List the car makes to be displayed
+  const carMakes = ['Mercedes', 'Toyota', 'Ford', 'Honda', 'Lexus', 'Mazda', 'Kia', 'Hyundai', 'Mitsubishi', 'Tesla', 'Subaru', 'Isuzu'];
+
+  // Fetch car details based on selected make
+  const fetchCarDetails = (carMake) => {
     setLoading(true);
     setError('');
-    setVehicleTypes([]);
+    setModels([]);
     setImageUrl('');
+    setSelectedCarMake(carMake);
 
-    const makesUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/GetVehicleTypesForMake/${carMake}?format=json`;
+    // API URLs for Image and Car Models
+    const makesUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMake/${carMake}?format=json`;
     const unsplashUrl = `https://api.unsplash.com/search/photos?query=${carMake}&per_page=1&client_id=${unsplashAccessKey}`;
 
-    // Fetch vehicle types for the car make
+    // Fetch car models from API
     axios.get(makesUrl)
       .then(response => {
+
         if (response.data.Results && response.data.Results.length > 0) {
-          // Remove duplicates based on VehicleTypeName
-          const uniqueTypes = response.data.Results.reduce((acc, curr) => {
-            const x = acc.find(item => item.VehicleTypeName === curr.VehicleTypeName);
-            if (!x) {
-              return acc.concat([curr]);
-            } else {
-              return acc;
-            }
-          }, []);
-          setVehicleTypes(uniqueTypes);
+          // Limits model results to 10
+          setModels(response.data.Results.slice(0, 10));
         } else {
-          setError('No vehicle types found.');
+          setError('No models found.');
         }
       })
       .catch(() => {
-        setError('Failed to fetch vehicle types.');
+        setError('Failed to fetch models.');
       });
 
-    // Fetch image from Unsplash
+    // Fetch image from API
     axios.get(unsplashUrl)
       .then(response => {
         if (response.data.results.length > 0) {
-          setImageUrl(response.data.results[0].urls.regular);
+          // Pick a random index from the results
+          const randomIndex = Math.floor(Math.random() * response.data.results.length);
+          // Set the image URL 
+          setImageUrl(response.data.results[randomIndex].urls.regular);
         } else {
           setError('No images found for this car make.');
         }
@@ -62,62 +66,69 @@ export default function App() {
 
   return (
     <LinearGradient
-      colors={['#FFD700', '#FF4500', '#800080']}
+    // Background Gradient colour to make site look more pleasing
+      colors={['blue', 'white']}
       style={styles.gradient}
     >
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Car Information Viewer</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter a car make (e.g., Tesla, BMW)"
-          value={carMake}
-          onChangeText={setCarMake}
-        />
-        <Button title="View Car" onPress={fetchCarModels} />
-        {loading && <ActivityIndicator size="large" color="#00ff00" />}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.image} /> : null}
-        {vehicleTypes.length > 0 && (
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoTitle}>Vehicle Types for {carMake}:</Text>
-            {vehicleTypes.map((type, index) => (
-              <Text key={index} style={styles.infoText}>{type.VehicleTypeName}</Text>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+      <View style={styles.container}>
+        <ScrollView style={styles.leftPane} contentContainerStyle={{ flexGrow: 1 }}>
+          {carMakes.map((make, index) => (
+            <TouchableOpacity key={index} onPress={() => fetchCarDetails(make)}>
+              <Text style={styles.carMake}>{make}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <ScrollView style={styles.rightPane} contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={styles.title}>Car Information Viewer</Text>
+          {loading && <ActivityIndicator size="large" color="#00ff00" />}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.image} /> : null}
+          {models.length > 0 && (
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoTitle}>Models for {selectedCarMake}:</Text>
+              {models.map((model, index) => (
+                <Text key={index} style={styles.infoText}>{model.Model_Name}</Text> //List car Models
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </View>
     </LinearGradient>
   );
 }
 
+// Styling for the Application
 const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
   container: {
+    flexDirection: 'row',
     flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    paddingBottom: Platform.OS === 'web' ? '20vh' : 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    fontSize: 30,
     textAlign: 'center',
-    color: 'black',
   },
-  input: {
-    height: 40,
-    borderColor: 'black',
-    borderWidth: 1,
-    marginBottom: 20,
-    paddingHorizontal: 10,
-    width: '40%',
-    borderRadius: 8,
-    textAlign: 'center',
+  leftPane: {
+    width: '35%',
     backgroundColor: '#fff',
+    paddingVertical: 100,
+  },
+  carMake: {
+    fontSize: 20,
+    padding: 15,
+    color: 'black',
+    textAlign: 'center',
+    borderBottomColor: '#ddd',
+    borderBottomWidth: 1,
+    alignItems: 'center',
+    width: '100%'
+  },
+  rightPane: {
+    width: '75%',
+    padding: 20,
   },
   image: {
     width: 600,
@@ -132,16 +143,18 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     marginTop: 20,
-    alignItems: 'center',
+    width: '100%',
   },
   infoTitle: {
     fontSize: 22,
-    color: '#fff',
+    color: '#000',
     marginVertical: 10,
+    textAlign: 'center',
   },
   infoText: {
     fontSize: 18,
-    color: '#fff',
+    color: '#000',
     marginVertical: 5,
+    textAlign: 'center',
   },
 });
