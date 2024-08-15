@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Image, ActivityIndicator, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { StyleSheet, Text, View, Image, ActivityIndicator, ScrollView, TouchableOpacity, Platform, Dimensions } from 'react-native';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function App() {
   // Manage Applicaition State
@@ -10,14 +11,21 @@ export default function App() {
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showDetails, setShowDetails] = useState(false);
+  const [isHovered, setIsHovered] = useState(false); 
 
-  // API access key
+  // API key
   const unsplashAccessKey = 'KPjZbLm5WYrLVamOw5tT28ebOjgxgVjgGHQha4oMtos';
 
   // List the car makes to be displayed
   const carMakes = ['Mercedes', 'Toyota', 'Ford', 'Honda', 'Lexus', 'Mazda', 'Kia', 'Hyundai', 'Mitsubishi', 'Tesla', 'Subaru', 'Isuzu'];
 
-  // Fetch car details based on selected make
+  // Setting the dimensions for a phone version of the app
+  const isPhone = Platform.OS !== 'web' && Dimensions.get('window').width < 768;
+
+  // Due to screen size, have reduced car makes to 8
+  const displayCarMakes = isPhone ? carMakes.slice(0, 8) : carMakes.slice(0, 10); 
+
   const fetchCarDetails = (carMake) => {
     setLoading(true);
     setError('');
@@ -32,10 +40,9 @@ export default function App() {
     // Fetch car models from API
     axios.get(makesUrl)
       .then(response => {
-
         if (response.data.Results && response.data.Results.length > 0) {
-          // Limits model results to 10
-          setModels(response.data.Results.slice(0, 10));
+          const modelLimit = Platform.OS === 'web' ? 10 : 5;
+          setModels(response.data.Results.slice(0, modelLimit));
         } else {
           setError('No models found.');
         }
@@ -43,14 +50,12 @@ export default function App() {
       .catch(() => {
         setError('Failed to fetch models.');
       });
-
-    // Fetch image from API
+    
+    // Fetch Image API
     axios.get(unsplashUrl)
       .then(response => {
         if (response.data.results.length > 0) {
-          // Pick a random index from the results
           const randomIndex = Math.floor(Math.random() * response.data.results.length);
-          // Set the image URL 
           setImageUrl(response.data.results[randomIndex].urls.regular);
         } else {
           setError('No images found for this car make.');
@@ -61,38 +66,68 @@ export default function App() {
       })
       .finally(() => {
         setLoading(false);
+        if (isPhone) {
+          setShowDetails(true);
+        }
       });
   };
 
-  return (
-    <LinearGradient
-    // Background Gradient colour to make site look more pleasing
-      colors={['blue', 'white']}
-      style={styles.gradient}
-    >
-      <View style={styles.container}>
-        <ScrollView style={styles.leftPane} contentContainerStyle={{ flexGrow: 1 }}>
-          {carMakes.map((make, index) => (
-            <TouchableOpacity key={index} onPress={() => fetchCarDetails(make)}>
-              <Text style={styles.carMake}>{make}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+  const goBack = () => {
+    setShowDetails(false);
+  };
 
-        <ScrollView style={styles.rightPane} contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={styles.title}>Car Information Viewer</Text>
-          {loading && <ActivityIndicator size="large" color="#00ff00" />}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.image} /> : null}
-          {models.length > 0 && (
-            <View style={styles.infoContainer}>
-              <Text style={styles.infoTitle}>Models for {selectedCarMake}:</Text>
-              {models.map((model, index) => (
-                <Text key={index} style={styles.infoText}>{model.Model_Name}</Text> //List car Models
-              ))}
-            </View>
-          )}
-        </ScrollView>
+  return (
+    <LinearGradient colors={['blue', 'white']} style={styles.gradient}>
+      <View style={styles.container}>
+        {isPhone && showDetails ? (
+          <ScrollView style={styles.rightPane} contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity
+              style={[styles.backButton, isHovered && styles.backButtonHovered]} 
+              onPress={goBack}
+              onPressIn={() => setIsHovered(true)}  // Hover effect
+              onPressOut={() => setIsHovered(false)} 
+            >
+              <Ionicons name="arrow-back" size={24} color="black" />
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+            {loading && <ActivityIndicator size="large" color="#00ff00" />}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.image} /> : null}
+            {models.length > 0 && (
+              <View style={styles.infoContainer}>
+                <Text style={styles.infoTitle}>Models for {selectedCarMake}:</Text>
+                {models.map((model, index) => (
+                  <Text key={index} style={styles.infoText}>{model.Model_Name}</Text>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        ) : (
+          <ScrollView style={styles.leftPane} contentContainerStyle={{ flexGrow: 1 }}>
+            <Text style={styles.title}>Car Information Viewer</Text>
+            {displayCarMakes.map((make, index) => (
+              <TouchableOpacity key={index} onPress={() => fetchCarDetails(make)}>
+                <Text style={styles.carMake}>{make}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {!isPhone && (
+          <ScrollView style={styles.rightPane} contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
+            {loading && <ActivityIndicator size="large" color="#00ff00" />}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.image} /> : null}
+            {models.length > 0 && (
+              <View style={styles.infoContainer}>
+                <Text style={styles.infoTitle}>Models for {selectedCarMake}:</Text>
+                {models.map((model, index) => (
+                  <Text key={index} style={styles.infoText}>{model.Model_Name}</Text>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )}
       </View>
     </LinearGradient>
   );
@@ -110,11 +145,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     textAlign: 'center',
+    paddingBottom: Platform.OS === 'web' ? 50 : 5,
   },
   leftPane: {
     width: '35%',
     backgroundColor: '#fff',
-    paddingVertical: 100,
+    paddingVertical: 50,
   },
   carMake: {
     fontSize: 20,
@@ -131,8 +167,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   image: {
-    width: 600,
-    height: 400,
+    width: Platform.OS === 'web' ? 600 : 300,
+    height: Platform.OS === 'web' ? 400 : 200,
     marginTop: 20,
     borderRadius: 10,
   },
@@ -156,5 +192,18 @@ const styles = StyleSheet.create({
     color: '#000',
     marginVertical: 5,
     textAlign: 'center',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backText: {
+    marginLeft: 5,
+    fontSize: 18,
+  },
+  backButtonHovered: {
+    borderBottomWidth: 2,
+    borderBottomColor: 'white',
   },
 });
